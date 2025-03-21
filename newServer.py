@@ -1,16 +1,7 @@
 import socket
 import threading
+import json
 
-HEADER = 64
-FORMAT = "utf-8"
-PORT = 5050
-SERVER = socket.gethostbyname(socket.gethostname())
-DCMSG = "--DISCONNECT"
-print(SERVER)
-
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-server.bind((SERVER, PORT))
 
 def handleClient(conn, addr):
     print(f"NEW CONNECTION: {addr} connected")
@@ -27,8 +18,7 @@ def handleClient(conn, addr):
                 connected = False
                 print(f"{addr} Disconnected.")
             else:
-                print(f"{addr}: {msg}")
-
+                print(f"[{addr}]: {msg}")
 
 
 def start():
@@ -78,8 +68,11 @@ class PlateManager:
     def load(self):
         f = open(self.logFile, "r")
 
-        rawUserData = json.loads(f.read())
-
+        try:
+            rawUserData = json.loads(f.read())
+        except:
+            print("No pre-existing data")
+            rawUserData = {}
 
         self.users = []
         for plate, data in rawUserData.items():
@@ -94,7 +87,8 @@ class PlateManager:
         userDict = {}
         for user in self.users:
             print(user.toJSON())
-            #f.write(f"{user.toJSON()}\n")
+
+            f.write(f"{user.toJSON()}\n")
 
     def addUser(self, user):
         self.users.append(user)
@@ -113,7 +107,7 @@ plateManager = PlateManager("data.json")
 plateManager.load()
 
 tobyOakes = User()
-tobyOakes.initialiseNewUser("YIL90W", "8510", "930.13")
+tobyOakes.initialiseNewUser("Y2390W", "3561", "9135")
 plateManager.addUser(tobyOakes)
 print(plateManager)
 plateManager.save()
