@@ -66,12 +66,12 @@ def handleArgs(conn, msg, plateManager):
     if args[0] == "TRYCHARGE" and len(args) >= 3: # TRYCHARGE:[PLATE]:[PIN]:[AMOUNT]
 
         for user in plateManager.users:
-            if user.plate == args[1] and user.pin == args[2]:
+            if user.plate == args[1] and user.pin == int(args[2]):
                 if (user.balance - float(args[3]) >= 0):
                     user.balance -= float(args[3])
                     plateManager.balance += float(args[3])
-                    #print(
-                    #    f"CHARGED {user.plate} ${args[3]}.\nNEW USER BALANCE: ${user.balance}.\nNEW BANK BALANCE: ${plateManager.balance}")
+                    print(
+                        f"CHARGED {user.plate} ${args[3]}.\nNEW USER BALANCE: ${user.balance}.\nNEW BANK BALANCE: ${plateManager.balance}")
                     break
                 else:
                     send(conn, "NULL")
