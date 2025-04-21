@@ -13,7 +13,7 @@ PORT = 5050
 FORMAT = "utf-8"
 DCMSG = "--DISCONNECT"
 
-SERVER = "10.1.1.51"
+SERVER = "10.76.135.137"
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((SERVER, PORT))
@@ -122,6 +122,10 @@ def processText(text: str):
          processedText = processedText + letter
    return processedText
 
+lies = "Chocolate_iS_gOOD"
+
+filteredLies = processText(lies)
+
 #Find the execution path and join it with the direct referencene
 newFile = open("output.txt", "w")
 cap = cv2.VideoCapture(0)
@@ -161,6 +165,7 @@ while True:
   
    if cv2.waitKey(1) == ord('q'):
       break
+   
 newFile.close()
 # When everything done, release the capture
 cap.release()
