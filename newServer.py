@@ -19,8 +19,10 @@ def handleClient(conn, addr, plateManager):
                 msg = str(conn.recv(msgLength).decode(FORMAT))
 
                 if msg == DCMSG:
+                    send(conn, "DISCONNECTED")
                     connected = False
                     print(f"{addr} Disconnected.")
+
                 else:
                     print(msg)
                     handleArgs(conn, msg, plateManager)

@@ -2,30 +2,36 @@ from PIL import Image
 import pytesseract
 import cv2
 import os, sys, inspect #For dynamic filepaths
-import numpy as np;
+import numpy as np
 import time
 import socket
 import threading
 import math
 
+connected = False
 HEADER = 64
 PORT = 5050
 FORMAT = "utf-8"
-DCMSG = "--DISCONNECT"
+DCMSG = "DISCONNECT"
 
-SERVER = "10.1.1.51"
+SERVER = "10.76.15.226"
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((SERVER, PORT))
+connected = True
 minReenterTime = 3
 
-
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 def receiveMsgs(client):
+    global connected
     while True:
         msgLength = int(client.recv(HEADER).decode(FORMAT))
         msg = client.recv(msgLength).decode(FORMAT)
-        print(msg)
+        print(SERVER, msg)
+        if msg == "DISCONNECTED":
+            sys.exit("Disconnected from server.")
+            connected = False
 
 def timeToString(specificTime):
     currTime = time.localtime(specificTime)
@@ -124,7 +130,7 @@ def processText(text: str):
 
 #Find the execution path and join it with the direct referencene
 newFile = open("output.txt", "w")
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(2)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
 
@@ -134,6 +140,8 @@ if not cap.isOpened():
     print("Cannot open camera")
     exit()
 while True:
+   if not connected:
+       break
    ret, frame = cap.read()
    if not ret:
       print("Failed :(")
@@ -147,6 +155,7 @@ while True:
    if ret:
       img = np.array(thresh)
       text = pytesseract.image_to_string(img)
+
       text = processText(text)
       print(text)
       if len(text) == 6:
@@ -158,6 +167,9 @@ while True:
             manager.tryRegister(text)
       if len(lastXPlates) >= 4:
          del(lastXPlates[0])
+
+      if text == "DISCONNECT":
+          send(client, "DISCONNECT")
   
    if cv2.waitKey(1) == ord('q'):
       break
