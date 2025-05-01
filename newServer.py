@@ -1,6 +1,10 @@
 import socket
 import threading
 import json
+import hashlib
+
+sha = hashlib.sha256()
+
 
 
 def handleClient(conn, addr, plateManager):
@@ -104,10 +108,18 @@ def handleArgs(conn, msg, plateManager):
 
     elif args[0] == "SHUTDOWN": # SHUTDOWN:[AUTHCODE]
         if len(args) == 2:
-            if args[1] == AUTHCODE:
+            sha.update(args[1].encode())
+            if sha.hexdigest() == AUTHCODE:
+
                 plateManager.save()
                 running = False
                 server.close()
+                plateManager.save()
+    elif args[0] == "GETPLATES":
+        print("--Plates--")
+        for user in plateManager.users:
+            print(user)
+            send(conn, user)
 
 
 
@@ -115,7 +127,7 @@ def handleArgs(conn, msg, plateManager):
 def getConsoleInput(plateManager):
     global running
     while running:
-        msg = input("")
+        msg = input(">>> ")
         handleArgs("BANK", msg, plateManager)
 
 
@@ -166,17 +178,17 @@ class PlateManager:
             self.balance = 0
         f = open(self.logFile, "r")
 
-        try:
-            rawUserData = json.loads(f.read())
-        except:
-            print("No pre-existing data")
-            rawUserData = {}
+        rawData = f.read()
+        if rawData != "":
 
-        self.users = []
-        for plate, data in rawUserData.items():
-            newUser = User()
-            newUser.initialiseFromJson(plate, data)
-            self.users.append(newUser)
+            loadedData = json.loads(rawData)
+
+
+            self.users = []
+            for plate, info in loadedData.items():
+                newUser = User()
+                newUser.initialiseFromJson(plate, info)
+                self.users.append(newUser)
 
         f.close()
 
@@ -186,9 +198,9 @@ class PlateManager:
         f = open(self.logFile, "w")
         userDict = {}
         for user in self.users:
-            print(user.toJSON())
-
-            f.write(f"{user.toJSON()}\n")
+            userDict[user.plate] = {"pin": user.pin, "balance": user.balance}
+        print(json.dumps(userDict))
+        f.write(json.dumps(userDict))
 
     def addUser(self, user):
         self.users.append(user)
@@ -203,11 +215,11 @@ class PlateManager:
 
 HEADER = 64
 FORMAT = "utf-8"
-PORT = 5050
+PORT = 50512
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 DCMSG = "DISCONNECT"
-AUTHCODE = "ELMO"
+AUTHCODE = "fb7edbc4da086ca9fc14dfa07217632fde09f93747ef638de86edd9bbb4c7533"
 running = True
 print(SERVER)
 

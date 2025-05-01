@@ -10,11 +10,11 @@ import math
 
 connected = False
 HEADER = 64
-PORT = 5050
+PORT = 50512
 FORMAT = "utf-8"
 DCMSG = "DISCONNECT"
 
-SERVER = "10.76.15.226"
+SERVER = "10.76.11.35"
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((SERVER, PORT))
@@ -115,7 +115,16 @@ class PlateManagerObj:
                 currUser.parked = not currUser.parked
                 currUser.timeEntered = time.time()
 
-                
+def consoleSend() -> None:
+    while True:
+        words = input(">>> ")
+        send(client, words)
+        if words == "END":
+            break
+    return None
+consoleS = threading.Thread(target=consoleSend)
+consoleS.start()
+
 
 manager = PlateManagerObj(1, "output.txt")
 receiver = threading.Thread(target=receiveMsgs, args=[client])
@@ -157,7 +166,7 @@ while True:
       text = pytesseract.image_to_string(img)
 
       text = processText(text)
-      print(text)
+
       if len(text) == 6:
          #print(text)
          lastXPlates.append(text)
