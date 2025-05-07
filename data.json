@@ -1,1 +1,5 @@
-{"QWERTY": {"pin": 1414, "balance": 900.0}, "ABCDEF": {"pin": 1111, "balance": 1355.3}, "ZKIQFC": {"pin": 3333, "balance": 83.5}, "1OLG1P": {"pin": 7777, "balance": 90.7}, "10LG1P": {"pin": 9999, "balance": 100.0}}
+{"QWERTY": {
+  "pin": "e872e5da0229ec15595dfada192e5e9c985bf3adaf762093710fd88c5a87057a",
+  "balance": 300.0,
+  "salt": "PSaO=BR$8,t(FqZ.h7sy]}asC[hnW6.O"}
+}

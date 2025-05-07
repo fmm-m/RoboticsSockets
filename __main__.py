@@ -1,3 +1,4 @@
+import ecies
 from PIL import Image
 import pytesseract
 import cv2
@@ -7,14 +8,15 @@ import time
 import socket
 import threading
 import math
+import binascii
 
-connected = False
 HEADER = 64
 PORT = 50512
 FORMAT = "utf-8"
 DCMSG = "DISCONNECT"
+publicKey = b""
 
-SERVER = "10.76.11.35"
+SERVER = "10.1.1.52"
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((SERVER, PORT))
@@ -24,14 +26,22 @@ minReenterTime = 3
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 def receiveMsgs(client):
-    global connected
+    global connected, publicKey
     while True:
-        msgLength = int(client.recv(HEADER).decode(FORMAT))
-        msg = client.recv(msgLength).decode(FORMAT)
-        print(SERVER, msg)
-        if msg == "DISCONNECTED":
-            sys.exit("Disconnected from server.")
-            connected = False
+        msgLength = client.recv(HEADER).decode(FORMAT)
+        if msgLength != "":
+            msgLength = int(msgLength)
+            msg = client.recv(msgLength).decode(FORMAT)
+            print(SERVER, msg)
+            if msg == "DISCONNECTED":
+                connected = False
+                sys.exit("Disconnected from server.")
+            msgArgs = msg.split(":")
+            if msgArgs[0] == "PUBLICKEY":
+                publicKey = binascii.unhexlify(msgArgs[1])
+
+        else:
+            break
 
 def timeToString(specificTime):
     currTime = time.localtime(specificTime)
@@ -39,10 +49,14 @@ def timeToString(specificTime):
 # [YYYY, MM, DD, HH, MM, SS]
 
 def send(client, msg):
-    msg = msg.encode(FORMAT)
-    msgLength = f"{len(msg):<{HEADER}}".encode(FORMAT)
-    client.send(msgLength)
-    client.send(msg)
+    if publicKey == b"":
+        print("[ERROR] Key is empty (Key has not been received).")
+    else:
+        encodedMsg = ecies.encrypt(publicKey, msg.encode("utf-8"))
+
+        msgLength = f"{len(encodedMsg):<{HEADER}}".encode(FORMAT)
+        client.send(msgLength)
+        client.send(encodedMsg)
 
 class User:
     def __init__(self, plate, pin, balance):
@@ -139,7 +153,7 @@ def processText(text: str):
 
 #Find the execution path and join it with the direct referencene
 newFile = open("output.txt", "w")
-cap = cv2.VideoCapture(2)
+cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
 

@@ -2,16 +2,28 @@ import socket
 import threading
 import json
 import hashlib
+import random
+import ecies
+import binascii
 
 sha = hashlib.sha256()
+
+keys = ecies.generate_key()
+
+secretKey = keys.secret
+PUBLICKEY = keys.public_key.format(True)
+
+
+
 
 
 
 def handleClient(conn, addr, plateManager):
     global running
-    print(f"NEW CONNECTION: {addr} connected")
+    print(f"NEW CONNECTION: {addr} connected\n")
     
     connected = True
+    send(conn, f"PUBLICKEY:{binascii.hexlify(PUBLICKEY).decode('utf-8')}")
     while connected:
         if not running:
             send(conn, DCMSG)
@@ -20,7 +32,10 @@ def handleClient(conn, addr, plateManager):
             msgLength = conn.recv(HEADER)
             if msgLength:
                 msgLength = int(msgLength)
-                msg = str(conn.recv(msgLength).decode(FORMAT))
+                msg = conn.recv(msgLength)
+
+                msg = ecies.decrypt(secretKey, msg).decode(FORMAT)
+                print(msg)
 
                 if msg == DCMSG:
                     send(conn, "DISCONNECTED")
@@ -28,10 +43,11 @@ def handleClient(conn, addr, plateManager):
                     print(f"{addr} Disconnected.")
 
                 else:
-                    print(msg)
+
                     handleArgs(conn, msg, plateManager)
         except ConnectionResetError:
             connected = False
+    print(f"{addr} disconnected.")
 
 
 def send(conn, msg):
@@ -41,12 +57,12 @@ def send(conn, msg):
         print("Sending...")
         msg = str(msg).encode(FORMAT)
 
-        msgLength = str(len(msg)).encode(FORMAT)
-        print(msgLength)
+        msgLength = str(len(msg))
+        msgLength = f"{msgLength:>64}".encode(FORMAT)
         conn.send(msgLength)
-        print("Sent Header")
+        print(f"HEADER OUT")
         conn.send(msg)
-        print("Sent Message")
+        print("MESSAGE OUT")
 
 def start(plateManager):
     global running
@@ -57,9 +73,10 @@ def start(plateManager):
             if not running:
                 break
             conn, addr = server.accept()
+
             thread = threading.Thread(target=handleClient, args=(conn, addr, plateManager))
             thread.start()
-            print(f"ACTIVE CONNECTIONS: {threading.active_count() - 1}")
+            print(f"ACTIVE CONNECTIONS: {threading.active_count() - 2}")
         except OSError:
             break
 
@@ -72,12 +89,13 @@ def handleArgs(conn, msg, plateManager):
     if args[0] == "TRYCHARGE" and len(args) >= 3: # TRYCHARGE:[PLATE]:[PIN]:[AMOUNT]
 
         for user in plateManager.users:
-            if user.plate == args[1] and user.pin == int(args[2]):
+            if user.plate == args[1] and user.pin == hash(args[2] + user.salt):
                 if (user.balance - float(args[3]) >= 0):
                     user.balance -= float(args[3])
                     plateManager.balance += float(args[3])
                     print(
                         f"CHARGED {user.plate} ${args[3]}.\nNEW USER BALANCE: ${user.balance}.\nNEW BANK BALANCE: ${plateManager.balance}")
+                    send(conn, "TRUE")
                     break
                 else:
                     send(conn, "NULL")
@@ -101,24 +119,29 @@ def handleArgs(conn, msg, plateManager):
                 send(conn, "NULL")
                 plateExists = True
                 break
+
         if not plateExists:
             newUser = User()
             newUser.initialiseNewUser(args[1], int(args[2]), float(args[3]))
             plateManager.users.append(newUser)
+            send(conn, "TRUE")
+
 
     elif args[0] == "SHUTDOWN": # SHUTDOWN:[AUTHCODE]
         if len(args) == 2:
-            sha.update(args[1].encode())
-            if sha.hexdigest() == AUTHCODE:
+
+            if hash(args[1]) == AUTHCODE:
 
                 plateManager.save()
                 running = False
                 server.close()
                 plateManager.save()
+            else:
+                send(conn, "NULL")
     elif args[0] == "GETPLATES":
         print("--Plates--")
         for user in plateManager.users:
-            print(user)
+            print(str(user))
             send(conn, user)
 
 
@@ -130,21 +153,31 @@ def getConsoleInput(plateManager):
         msg = input(">>> ")
         handleArgs("BANK", msg, plateManager)
 
+def hash(text):
+    hSha = hashlib.sha256()
+    hSha.update(text.encode())
+    return hSha.hexdigest()
 
 class User:
     def __init__(self):
         self.plate = None
         self.pin = None
+        self.salt = ""
         self.balance = None
 
     def initialiseNewUser(self, plate, pin, balance):
         self.plate = plate
-        self.pin = int(pin)
+
+        self.salt = ""
+        for _ in range(0, 32):
+            self.salt += chr(random.randrange(40, 127))
+        self.pin = hash(str(pin) + self.salt)
         self.balance = float(balance)
 
     def initialiseFromJson(self, plate, info):
         self.plate = plate
-        self.pin = int(info["pin"])
+        self.pin = info["pin"]
+        self.salt = info["salt"]
         self.balance = float(info["balance"])
 
     def toJSON(self):
@@ -152,13 +185,17 @@ class User:
         return json.dumps({
             self.plate : {
                 "pin" : self.pin,
+                "salt" : self.salt,
                 "balance" : self.balance
             }
         })
 
     def setPin(self, oldPin, newPin):
-        if oldPin == self.pin:
+
+        if hash(oldPin + self.salt) == self.pin:
             self.pin = newPin
+    def __str__(self):
+        return f"{self.plate},{self.balance},{self.pin},{self.salt}"
 
 
 class PlateManager:
@@ -198,7 +235,7 @@ class PlateManager:
         f = open(self.logFile, "w")
         userDict = {}
         for user in self.users:
-            userDict[user.plate] = {"pin": user.pin, "balance": user.balance}
+            userDict[user.plate] = {"pin": user.pin, "balance": user.balance, "salt": user.salt}
         print(json.dumps(userDict))
         f.write(json.dumps(userDict))
 
@@ -207,9 +244,11 @@ class PlateManager:
 
     def __str__(self):
 
-        returnStr = f"BANK OF MICAH:\nBALANCE: {self.balance}\n"
+        returnStr = f"BANK OF MICAH:\nBALANCE: {self.balance}\n\n"
+        returnStr += "PLATE  || BALANCE\n"
+        returnStr += "-----------------\n"
         for user in self.users:
-            returnStr = returnStr + f"{user.plate} || {user.pin} || {user.balance}\n"
+            returnStr += f"{user.plate} || ${user.balance}\n"
         return returnStr
 
 
