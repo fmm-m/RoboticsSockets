@@ -102,6 +102,7 @@ def handleArgs(conn, msg, plateManager):
                         f"CHARGED {user.plate} ${args[3]}.\nNEW USER BALANCE: ${user.balance}.\nNEW BANK BALANCE: ${plateManager.balance}")
                     send(conn, "TRUE")
                     sent = True
+                    plateManager.save()
                     break
                 else:
                     send(conn, "ERROR1")
@@ -132,13 +133,14 @@ def handleArgs(conn, msg, plateManager):
             newUser = User()
             newUser.initialiseNewUser(args[1], int(args[2]), float(args[3]))
             plateManager.users.append(newUser)
+            plateManager.save()
             send(conn, "TRUE")
 
 
     elif args[0] == "SHUTDOWN": # SHUTDOWN:[AUTHCODE]
         if len(args) == 2:
 
-            if hash(args[1]) == AUTHCODE:
+            if hash(args[1]) == AUTHCODE or (args[1] == AUTHCODE):
 
                 plateManager.save()
                 running = False
@@ -265,14 +267,15 @@ PORT = 50512
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 DCMSG = "DISCONNECT"
-AUTHCODE = "fb7edbc4da086ca9fc14dfa07217632fde09f93747ef638de86edd9bbb4c7533"
+# AUTHCODE = "fb7edbc4da086ca9fc14dfa07217632fde09f93747ef638de86edd9bbb4c7533"
+AUTHCODE = "Password1234"
 running = True
 print(SERVER)
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind(ADDR)
 
-plateManager = PlateManager("data.json", 0.0, "bankData.txt")
+plateManager = PlateManager("/home/micah/programming/sockets/data.json", 0.0, "/home/micah/programming/sockets/bankData.txt")
 plateManager.load()
 print(plateManager)
 
