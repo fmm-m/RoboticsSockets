@@ -6,48 +6,9 @@ import random
 import ecies
 import binascii
 
-sha = hashlib.sha256()
 
-keys = ecies.generate_key()
-
-secretKey = keys.secret
-PUBLICKEY = keys.public_key.format(True)
-
-
-
-
-
-
-def handleClient(conn, addr, plateManager):
-    global running
-    print(f"NEW CONNECTION: {addr} connected\n")
-    
-    connected = True
-    send(conn, f"PUBLICKEY:{binascii.hexlify(PUBLICKEY).decode('utf-8')}")
-    while connected:
-        if not running:
-            send(conn, DCMSG)
-            break
-        try:
-            msgLength = conn.recv(HEADER)
-            if msgLength:
-                msgLength = int(msgLength)
-                msg = conn.recv(msgLength)
-
-                msg = ecies.decrypt(secretKey, msg).decode(FORMAT)
-                print(msg)
-
-                if msg == DCMSG:
-                    send(conn, "DISCONNECTED")
-                    connected = False
-                    print(f"{addr} Disconnected.")
-
-                else:
-
-                    handleArgs(conn, msg, plateManager)
-        except ConnectionResetError:
-            connected = False
-    print(f"{addr} disconnected.")
+# Stores our clients and their respective keys. addr: keyobject
+clients = {}
 
 
 def send(conn, msg):
@@ -58,27 +19,71 @@ def send(conn, msg):
         msg = str(msg).encode(FORMAT)
 
         msgLength = str(len(msg))
-        msgLength = f"{msgLength:>64}".encode(FORMAT)
+        msgLength = f"{msgLength:>64}".encode(FORMAT) # Pads the header to 64 bytes
         conn.send(msgLength)
         print(f"HEADER OUT")
         conn.send(msg)
         print("MESSAGE OUT")
 
+
 def start(plateManager):
     global running
     server.listen()
 
-    while True:
+    while True: # Constantly accepting new clients
         try:
             if not running:
                 break
             conn, addr = server.accept()
-
+            clients[addr] = ecies.generate_key() # add a new keyobject to the clients dict
             thread = threading.Thread(target=handleClient, args=(conn, addr, plateManager))
             thread.start()
-            print(f"ACTIVE CONNECTIONS: {threading.active_count() - 2}")
+            print(f"ACTIVE CONNECTIONS: {threading.active_count() - 2}") # -2 because of the console thread and the start thread
         except OSError:
             break
+
+# ERRORS:
+# ERROR1 - User does not have sufficient balance to make the transaction (TRYCHARGE)
+# ERROR2 - User does not exist (GETPLATEINFO, TRYCHARGE)
+# ERROR3 - User already exists (REGISTERPLATE)
+# ERROR4 - Invalid Authcode (SHUTDOWN)
+
+def handleClient(conn, addr, plateManager):
+    global running
+    print(f"NEW CONNECTION: {addr} connected\n")
+    
+    connected = True
+    # Send the initial public key
+    send(conn, f"PUBLICKEY:{binascii.hexlify(clients[addr].public_key.format(True)).decode('utf-8')}")
+    while connected:
+        if not running:
+            send(conn, DCMSG)
+            break
+        try:
+            msgLength = conn.recv(HEADER) # Receive incoming headers from clients
+            if msgLength:
+                msgLength = int(msgLength)
+                msg = conn.recv(msgLength)
+
+                msg = ecies.decrypt(clients[addr].secret, msg).decode(FORMAT) # Receive X bytes specified by msgLength
+                print(msg)
+
+                if msg == DCMSG:
+                    send(conn, "DISCONNECTED")
+                    connected = False
+                    print(f"{addr} Disconnected.")
+
+                else:
+
+                    handleArgs(conn, msg, plateManager)
+
+                # Create new key pair and send to the client
+                clients[addr] = ecies.generate_key()
+                send(conn, f"PUBLICKEY:{binascii.hexlify(clients[addr].public_key.format(True)).decode('utf-8')}")
+        except ConnectionResetError:
+            connected = False
+    print(f"{addr} disconnected.")
+    del(clients[addr])
 
 
 def handleArgs(conn, msg, plateManager):
@@ -87,18 +92,21 @@ def handleArgs(conn, msg, plateManager):
     sent = False
 
     if args[0] == "TRYCHARGE" and len(args) >= 3: # TRYCHARGE:[PLATE]:[PIN]:[AMOUNT]
-
+        sent = False
         for user in plateManager.users:
-            if user.plate == args[1] and user.pin == hash(args[2] + user.salt):
+            if user.plate == args[1] and user.pin == hash(args[2] + user.salt): # Find the corresponding user
                 if (user.balance - float(args[3]) >= 0):
                     user.balance -= float(args[3])
                     plateManager.balance += float(args[3])
                     print(
                         f"CHARGED {user.plate} ${args[3]}.\nNEW USER BALANCE: ${user.balance}.\nNEW BANK BALANCE: ${plateManager.balance}")
                     send(conn, "TRUE")
+                    sent = True
                     break
                 else:
-                    send(conn, "NULL")
+                    send(conn, "ERROR1")
+        if not sent:
+            send(conn, "ERROR2")
 
     elif args[0] == "GETBANKBALANCE": # GETBANKBALANCE
         send(conn, plateManager.balance)
@@ -110,13 +118,13 @@ def handleArgs(conn, msg, plateManager):
                 sent = True
                 break
         if not sent:
-            send(conn, "NULL")
+            send(conn, "ERROR2")
 
     elif args[0] == "REGISTERPLATE" and len(args) >= 4: # TRYREGISTERPLATE:[PLATE]:[PIN]:[BALANCE]
         plateExists = False
         for user in plateManager.users:
             if user.plate == args[1]:
-                send(conn, "NULL")
+                send(conn, "ERROR3")
                 plateExists = True
                 break
 
@@ -137,14 +145,11 @@ def handleArgs(conn, msg, plateManager):
                 server.close()
                 plateManager.save()
             else:
-                send(conn, "NULL")
+                send(conn, "ERROR4")
     elif args[0] == "GETPLATES":
-        print("--Plates--")
         for user in plateManager.users:
             print(str(user))
             send(conn, user)
-
-
 
 
 def getConsoleInput(plateManager):
@@ -153,10 +158,12 @@ def getConsoleInput(plateManager):
         msg = input(">>> ")
         handleArgs("BANK", msg, plateManager)
 
+
 def hash(text):
     hSha = hashlib.sha256()
     hSha.update(text.encode())
     return hSha.hexdigest()
+
 
 class User:
     def __init__(self):
@@ -274,4 +281,3 @@ handleConsole = threading.Thread(target=getConsoleInput,args=[plateManager])
 handleConsole.start()
 
 start(plateManager)
-
