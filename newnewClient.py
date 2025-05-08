@@ -11,7 +11,7 @@ DCMSG = "DISCONNECT"
 publicKey = b""
 
 #SERVER = "10.1.1.52"
-SERVER = "127.0.1.1"
+SERVER = "10.76.95.177"
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((SERVER, PORT))
@@ -54,19 +54,19 @@ receiver.start()
 while True:
    if not connected:
        break
-   text = input("1. Test charging a car\n2. Get Bank Balance\n3. Get Plate Info\n4. Try registering new card\n5. Disconnect")
+   text = input("1. Test charging a card\n2. Get Bank Balance\n3. Get CARD Info\n4. Try registering new card\n5. Disconnect")
    
-   if text == "1": # TRYCHARGE:[PLATE]:[PIN]:[AMOUNT]
-       args = input("Please enter PLATE:PIN:AMOUNT ")
+   if text == "1": # TRYCHARGE:[CARDNUMBER]:[PIN]:[AMOUNT]
+       args = input("Please enter CARDNUMBER:PIN:AMOUNT ")
        send(client, f"TRYCHARGE:{args}")
    elif text == "2": # GETBANKBALANCE
        send(client, "GETBANKBALANCE:")
-   elif text == "3":    # GETPLATEINFO:[PLATE]
-       args = input("Please enter PLATE ")
-       send(client, "GETPLATEINFO:"+args)
-   elif text == "4":    # REGISTERPLATE:[PLATE]:[PIN]:[BALANCE]
-       args = input("Please enter PLATE:PIN:BALANCE ")
-       send(client, f"REGISTERPLATE:{args}")
+   elif text == "3":    # GETCARDINFO:[CARDNUMBER]
+       args = input("Please enter CARDNUMBER ")
+       send(client, "GETCARDINFO:"+args)
+   elif text == "4":    # REGISTERCARD:[CARD]:[PIN]:[BALANCE]
+       args = input("Please enter CARD:PIN:BALANCE ")
+       send(client, f"REGISTERCARD:{args}")
    elif text == "5":
         send(client, "DISCONNECT")
         break

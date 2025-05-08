@@ -112,7 +112,7 @@ def handleArgs(conn, msg, plateManager):
     elif args[0] == "GETBANKBALANCE": # GETBANKBALANCE
         send(conn, plateManager.balance)
 
-    elif args[0] == "GETPLATEINFO" and len(args) >= 2: # GETPLATEINFO:[PLATE]
+    elif args[0] == "GETCARDINFO" and len(args) >= 2: # GETPLATEINFO:[PLATE]
         for user in plateManager.users:
             if user.plate == args[1]:
                 send(conn, f"{user.pin}:{user.balance}")
@@ -121,7 +121,7 @@ def handleArgs(conn, msg, plateManager):
         if not sent:
             send(conn, "ERROR2")
 
-    elif args[0] == "REGISTERPLATE" and len(args) >= 4: # TRYREGISTERPLATE:[PLATE]:[PIN]:[BALANCE]
+    elif args[0] == "REGISTERCARD" and len(args) >= 4: # TRYREGISTERPLATE:[PLATE]:[PIN]:[BALANCE]
         plateExists = False
         for user in plateManager.users:
             if user.plate == args[1]:
@@ -148,7 +148,7 @@ def handleArgs(conn, msg, plateManager):
                 plateManager.save()
             else:
                 send(conn, "ERROR4")
-    elif args[0] == "GETPLATES":
+    elif args[0] == "GETCARDS":
         for user in plateManager.users:
             print(str(user))
             send(conn, user)
@@ -264,7 +264,8 @@ class PlateManager:
 HEADER = 64
 FORMAT = "utf-8"
 PORT = 50512
-SERVER = socket.gethostbyname(socket.gethostname())
+#SERVER = socket.gethostbyname(socket.gethostname())
+SERVER = "10.76.95.177"
 ADDR = (SERVER, PORT)
 DCMSG = "DISCONNECT"
 # AUTHCODE = "fb7edbc4da086ca9fc14dfa07217632fde09f93747ef638de86edd9bbb4c7533"
