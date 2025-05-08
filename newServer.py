@@ -8,7 +8,8 @@ import binascii
 
 
 # Stores our clients and their respective keys. addr: keyobject
-clients = {}
+addressKeyPairs = {}
+clients = []
 
 
 def send(conn, msg):
@@ -35,8 +36,9 @@ def start(plateManager):
             if not running:
                 break
             conn, addr = server.accept()
-            clients[addr] = ecies.generate_key() # add a new keyobject to the clients dict
+            addressKeyPairs[addr] = ecies.generate_key() # add a new keyobject to the clients dict
             thread = threading.Thread(target=handleClient, args=(conn, addr, plateManager))
+            clients.append(conn)
             thread.start()
             print(f"ACTIVE CONNECTIONS: {threading.active_count() - 2}") # -2 because of the console thread and the start thread
         except OSError:
@@ -54,7 +56,7 @@ def handleClient(conn, addr, plateManager):
     
     connected = True
     # Send the initial public key
-    send(conn, f"PUBLICKEY:{binascii.hexlify(clients[addr].public_key.format(True)).decode('utf-8')}")
+    send(conn, f"PUBLICKEY:{binascii.hexlify(addressKeyPairs[addr].public_key.format(True)).decode('utf-8')}")
     while connected:
         if not running:
             send(conn, DCMSG)
@@ -65,7 +67,7 @@ def handleClient(conn, addr, plateManager):
                 msgLength = int(msgLength)
                 msg = conn.recv(msgLength)
 
-                msg = ecies.decrypt(clients[addr].secret, msg).decode(FORMAT) # Receive X bytes specified by msgLength
+                msg = ecies.decrypt(addressKeyPairs[addr].secret, msg).decode(FORMAT) # Receive X bytes specified by msgLength
                 print(msg)
 
                 if msg == DCMSG:
@@ -78,18 +80,28 @@ def handleClient(conn, addr, plateManager):
                     handleArgs(conn, msg, plateManager)
 
                 # Create new key pair and send to the client
-                clients[addr] = ecies.generate_key()
-                send(conn, f"PUBLICKEY:{binascii.hexlify(clients[addr].public_key.format(True)).decode('utf-8')}")
+                addressKeyPairs[addr] = ecies.generate_key()
+                send(conn, f"PUBLICKEY:{binascii.hexlify(addressKeyPairs[addr].public_key.format(True)).decode('utf-8')}")
         except ConnectionResetError:
             connected = False
     print(f"{addr} disconnected.")
-    del(clients[addr])
+    del(addressKeyPairs[addr])
+
+def broadcast(msg):
+    for client in clients:
+        try:
+            send(client, msg)
+        except:
+            pass
 
 
 def handleArgs(conn, msg, plateManager):
     global running
     args = msg.split(":")
     sent = False
+    if conn == "BANK":
+        if args[0] == "BROADCAST" and len(args) >= 2:
+            broadcast("Bank of Micah Says: " + args[1])
 
     if args[0] == "TRYCHARGE" and len(args) >= 3: # TRYCHARGE:[PLATE]:[PIN]:[AMOUNT]
         sent = False
@@ -106,6 +118,7 @@ def handleArgs(conn, msg, plateManager):
                     break
                 else:
                     send(conn, "ERROR1")
+                    break
         if not sent:
             send(conn, "ERROR2")
 
@@ -140,7 +153,7 @@ def handleArgs(conn, msg, plateManager):
     elif args[0] == "SHUTDOWN": # SHUTDOWN:[AUTHCODE]
         if len(args) == 2:
 
-            if hash(args[1]) == AUTHCODE or (args[1] == AUTHCODE):
+            if hash(args[1]) == AUTHCODE:
 
                 plateManager.save()
                 running = False
@@ -268,8 +281,8 @@ PORT = 50512
 SERVER = "10.76.95.177"
 ADDR = (SERVER, PORT)
 DCMSG = "DISCONNECT"
-# AUTHCODE = "fb7edbc4da086ca9fc14dfa07217632fde09f93747ef638de86edd9bbb4c7533"
-AUTHCODE = "Password1234"
+AUTHCODE = "a0f3285b07c26c0dcd2191447f391170d06035e8d57e31a048ba87074f3a9a15"
+# AUTHCODE = "Password1234"
 running = True
 print(SERVER)
 

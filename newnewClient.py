@@ -26,13 +26,17 @@ def receiveMsgs(client):
         if msgLength != "":
             msgLength = int(msgLength)
             msg = client.recv(msgLength).decode(FORMAT)
-            print(SERVER, msg)
+            
+            #print(SERVER, msg)
             if msg == "DISCONNECTED":
+                print(SERVER, msg)
                 connected = False
                 sys.exit("Disconnected from server.")
             msgArgs = msg.split(":")
             if msgArgs[0] == "PUBLICKEY":
                 publicKey = binascii.unhexlify(msgArgs[1])
+            else:
+                print(SERVER, msg)
 
         else:
             break
@@ -69,8 +73,5 @@ while True:
        send(client, f"REGISTERCARD:{args}")
    elif text == "5":
         send(client, "DISCONNECT")
-        break
-   elif text == "6":
-        send(client, "SHUTDOWN:Password1234")
         break
 exit()
