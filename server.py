@@ -45,6 +45,7 @@ def start(plateManager):
             break
 
 # ERRORS:
+# ERROR0 - Pin is wrong (TRYCHARGE)
 # ERROR1 - User does not have sufficient balance to make the transaction (TRYCHARGE)
 # ERROR2 - User does not exist (GETPLATEINFO, TRYCHARGE)
 # ERROR3 - User already exists (REGISTERPLATE)
@@ -105,22 +106,28 @@ def handleArgs(conn, msg, plateManager):
 
     if args[0] == "TRYCHARGE" and len(args) >= 3: # TRYCHARGE:[PLATE]:[PIN]:[AMOUNT]
         sent = False
+        userCheck = False
         for user in plateManager.users:
-            if user.plate == args[1] and user.pin == hash(args[2] + user.salt): # Find the corresponding user
-                if (user.balance - float(args[3]) >= 0):
-                    user.balance -= float(args[3])
-                    plateManager.balance += float(args[3])
-                    print(
-                        f"CHARGED {user.plate} ${args[3]}.\nNEW USER BALANCE: ${user.balance}.\nNEW BANK BALANCE: ${plateManager.balance}")
-                    send(conn, "TRUE")
-                    sent = True
-                    plateManager.save()
-                    break
-                else:
-                    send(conn, "ERROR1")
-                    break
+            if user.plate == args[1]: # Find the corresponding user
+                userCheck = True
+                if user.pin == hash(args[2] + user.salt):
+                    if (user.balance - float(args[3]) >= 0):
+                        user.balance -= float(args[3])
+                        plateManager.balance += float(args[3])
+                        print(
+                            f"CHARGED {user.plate} ${args[3]}.\nNEW USER BALANCE: ${user.balance}.\nNEW BANK BALANCE: ${plateManager.balance}")
+                        send(conn, "TRUE")
+                        sent = True
+                        plateManager.save()
+                        break
+                    else:
+                        send(conn, "ERROR1")
+                        break
         if not sent:
-            send(conn, "ERROR2")
+            if not userCheck:
+                send(conn, "ERROR2")
+            else:
+                send(conn, "ERROR0")
 
     elif args[0] == "GETBANKBALANCE": # GETBANKBALANCE
         send(conn, plateManager.balance)

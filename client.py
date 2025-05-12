@@ -67,7 +67,7 @@ while True:
        send(client, "GETBANKBALANCE:")
    elif text == "3":    # GETCARDINFO:[CARDNUMBER]
        args = input("Please enter CARDNUMBER ")
-       send(client, "GETCARDINFO:"+args)
+       send(client, f"GETCARDINFO:{args}")
    elif text == "4":    # REGISTERCARD:[CARD]:[PIN]:[BALANCE]
        args = input("Please enter CARD:PIN:BALANCE ")
        send(client, f"REGISTERCARD:{args}")
