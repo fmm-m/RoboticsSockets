@@ -1,3 +1,14 @@
+'''
+The below code is a mixture of the client.py and following the below tutorial to deal with the RFID
+https://www.circuitbasics.com/what-is-an-rfid-reader-writer/
+
+Hints:
+* You should be able to just use this script as a helper to sign up a couple of cards for you to use on the bank server
+* My implementation writes the pin to the card, if you want more security, don't do this and make user type in PIN after tapping card on the bank transfer
+* For payment: you can grab both the ID and pin off the card in one line by: id, pin = reader.read()
+* I haven't tested making a payment, but how hard could it be... 😎
+'''
+
 import ecies
 import sys
 import socket
@@ -17,7 +28,6 @@ FORMAT = "utf-8"
 DCMSG = "DISCONNECT"
 publicKey = b""
 
-#SERVER = "10.1.1.52"
 SERVER = "10.76.95.177"
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -66,11 +76,18 @@ while True:
     if not connected:
         break
     try:
+        # Get the data you need from user
         pin = input('Pin: ')
         balance = input('Balance: ')
         print("Now place your tag to write")
+
+        # Grab card ID
         card = reader.read_id()
+
+        # Write pin to card
         reader.write(pin)
+        
+        # Register with the server
         send(client, f"REGISTERCARD:{card}:{pin}:{balance}")
     finally:
         GPIO.cleanup()
