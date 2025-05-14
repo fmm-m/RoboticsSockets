@@ -50,6 +50,7 @@ def start(plateManager):
 # ERROR2 - User does not exist (GETPLATEINFO, TRYCHARGE)
 # ERROR3 - User already exists (REGISTERPLATE)
 # ERROR4 - Invalid Authcode (SHUTDOWN)
+# ERROR5 - Supplied a negative value (TRYCHARGE, REGISTERPLATE)
 
 def handleClient(conn, addr, plateManager):
     global running
@@ -112,14 +113,17 @@ def handleArgs(conn, msg, plateManager):
                 userCheck = True
                 if user.pin == hash(args[2] + user.salt):
                     if (user.balance - float(args[3]) >= 0):
-                        user.balance -= float(args[3])
-                        plateManager.balance += float(args[3])
-                        print(
-                            f"CHARGED {user.plate} ${args[3]}.\nNEW USER BALANCE: ${user.balance}.\nNEW BANK BALANCE: ${plateManager.balance}")
-                        send(conn, "TRUE")
-                        sent = True
-                        plateManager.save()
-                        break
+                        if !(args[3] > 0):
+                            send(conn, "ERROR5")
+                        else:
+                            user.balance -= float(args[3])
+                            plateManager.balance += float(args[3])
+                            print(
+                                f"CHARGED {user.plate} ${args[3]}.\nNEW USER BALANCE: ${user.balance}.\nNEW BANK BALANCE: ${plateManager.balance}")
+                            send(conn, "TRUE")
+                            sent = True
+                            plateManager.save()
+                            break
                     else:
                         send(conn, "ERROR1")
                         break
@@ -150,11 +154,14 @@ def handleArgs(conn, msg, plateManager):
                 break
 
         if not plateExists:
-            newUser = User()
-            newUser.initialiseNewUser(args[1], int(args[2]), float(args[3]))
-            plateManager.users.append(newUser)
-            plateManager.save()
-            send(conn, "TRUE")
+            if !(args[3] > 0):
+                send(conn, "ERROR5")
+            else:
+                newUser = User()
+                newUser.initialiseNewUser(args[1], int(args[2]), float(args[3]))
+                plateManager.users.append(newUser)
+                plateManager.save()
+                send(conn, "TRUE")
 
 
     elif args[0] == "SHUTDOWN": # SHUTDOWN:[AUTHCODE]
